@@ -4,20 +4,23 @@ import { CartItem } from "@/types";
 import CheckoutClient from "@/components/CheckoutClient";
 
 // ─── SSR data fetch ───────────────────────────────────────────────────────────
-// Runs on the server — equivalent to getServerSideProps in Pages Router.
-// cache: "no-store" ensures fresh data on every request (true SSR behaviour).
 async function getCartData(): Promise<{
   cart: CartItem[];
   shippingFee: number;
 }> {
-  const base =
-    process.env.NEXT_PUBLIC_BASE_URL ??
-    (process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000");
+  // Logic to determine the base URL dynamically for SSR
+  const base = process.env.NEXT_PUBLIC_BASE_URL 
+    ? process.env.NEXT_PUBLIC_BASE_URL 
+    : process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : "http://localhost:3000";
 
   const res = await fetch(`${base}/api/cart`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Cart API error: ${res.status}`);
+  
+  if (!res.ok) {
+    console.error(`Fetch failed at: ${base}/api/cart`);
+    throw new Error(`Cart API error: ${res.status}`);
+  }
 
   const data = await res.json();
 
@@ -37,7 +40,8 @@ async function getCartData(): Promise<{
         : "Set of 5 · Organic cotton",
       qty:      item.quantity,
       price:    item.product_price,
-      image:    `https://${item.image}`,
+      // Fixed the image URL logic to handle the API response correctly
+      image:    item.image.startsWith('http') ? item.image : `https://${item.image}`,
     })
   );
 
@@ -48,7 +52,6 @@ async function getCartData(): Promise<{
 export default async function Home() {
   const { cart, shippingFee } = await getCartData();
 
-  // Server-fetched data passed as props → CheckoutClient hydrates on the client
   return <CheckoutClient initialCart={cart} shippingFee={shippingFee} />;
 }
 
